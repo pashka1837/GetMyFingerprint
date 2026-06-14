@@ -12,3 +12,7 @@ export type FingerprintResult = {
 export type FingerprintPayload = FingerprintResult & {
   cookies: any[];
 };
+
+export type FailedFPPayload = {
+  message: string;
+};

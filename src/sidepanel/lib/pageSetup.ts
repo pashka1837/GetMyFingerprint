@@ -1,0 +1,109 @@
+import { ONLYFANS_URL } from "../utils/const";
+import { FidstyClientError } from "../utils/errors";
+
+const ONLYFANS_URL_PATTERNS = ["*://onlyfans.com/*"];
+
+export function isOnlyfansUrl(url?: string) {
+  return !!url && url.includes("onlyfans.com");
+}
+
+export async function findOnlyfansTab() {
+  try {
+    const tabs = await chrome.tabs.query({
+      currentWindow: true,
+      url: ONLYFANS_URL_PATTERNS,
+    });
+
+    return tabs.pop() ?? null;
+  } catch (error) {
+    throw new FidstyClientError("Unable to find onlyfans.com page.");
+  }
+}
+
+export async function openOnlyfansTab() {
+  try {
+    const tab = await chrome.tabs.create({
+      active: true,
+      url: ONLYFANS_URL,
+    });
+
+    const { id: tabId } = tab;
+
+    if (!tabId)
+      throw new FidstyClientError("Unable to open onlyfans.com page.");
+
+    return tabId;
+  } catch (error) {
+    throw new FidstyClientError("Unable to open onlyfans.com page.");
+  }
+}
+
+export async function ensureOnlyfansTab() {
+  try {
+    let tab = await findOnlyfansTab();
+    let isNewTab = false;
+
+    if (!tab) {
+      const tabId = await openOnlyfansTab();
+      tab = await chrome.tabs.get(tabId).catch(() => {
+        throw new FidstyClientError("Unable to open onlyfans.com page.");
+      });
+      isNewTab = true;
+    }
+
+    const { id: tabId } = tab;
+
+    if (!tabId)
+      throw new FidstyClientError("Unable to detect onlyfans.com page.");
+
+    return { tabId, isNewTab };
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function getPageId() {
+  const { tabId } = await ensureOnlyfansTab();
+  return tabId;
+}
+
+export async function getOnlyfansCookies() {
+  return chrome.cookies.getAll({
+    url: ONLYFANS_URL,
+  });
+}
+
+export function hasOnlyfansAuthCookies(cookies: chrome.cookies.Cookie[]) {
+  const authIdCookie = cookies.find((cookie) => cookie.name === "auth_id");
+  const authId = authIdCookie?.value?.trim();
+
+  if (!authId) return false;
+
+  return true;
+}
+
+function getCookieUrl(cookie: chrome.cookies.Cookie) {
+  const protocol = cookie.secure ? "https" : "http";
+  const domain = cookie.domain.replace(/^\./, "");
+  const path = cookie.path || "/";
+
+  return `${protocol}://${domain}${path}`;
+}
+
+export async function clearOnlyfansCookies() {
+  const cookies = await getOnlyfansCookies();
+
+  await Promise.allSettled(
+    cookies.map((cookie) =>
+      chrome.cookies.remove({
+        name: cookie.name,
+        url: getCookieUrl(cookie),
+        storeId: cookie.storeId,
+      }),
+    ),
+  );
+}
+
+export async function refreshOnlyfansTab(tabId: number) {
+  await chrome.tabs.reload(tabId);
+}

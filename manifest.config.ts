@@ -1,9 +1,13 @@
 import { defineManifest } from "@crxjs/vite-plugin";
 
-export default defineManifest((mode) => ({
+export default defineManifest(({ mode }) => ({
   manifest_version: 3,
   name:
-    mode === "development" ? "[DEV] Get My Fingerprint" : "Get My Fingerprint",
+    mode === "development"
+      ? "[DEV] Get My Fingerprint"
+      : mode === "production"
+        ? "[PROD] Get My Fingerprint"
+        : "Get My Fingerprint",
   short_name: "Get My Fingerprint",
   version: "7.0.0",
   description: "Get My Fingerprint",
@@ -43,7 +47,7 @@ export default defineManifest((mode) => ({
   host_permissions: [
     "*://onlyfans.com/*",
     "*://*.onlyfans.com/*",
-    "*://localhost:3000/*",
+    "http://localhost:3000/*",
     "*://fidsty.com/*",
     "*://*.fidsty.com/*",
   ],

@@ -2,9 +2,10 @@ import { defineConfig } from "vite";
 import { crx } from "@crxjs/vite-plugin";
 import manifest from "./manifest.config";
 import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [crx({ manifest }), tailwindcss()],
+  plugins: [react(), crx({ manifest }), tailwindcss()],
 
   // Helps side panel + extension pages talk to Vite dev server (HMR)
   server: {

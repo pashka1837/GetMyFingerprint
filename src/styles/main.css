@@ -1,3 +1,30 @@
 @import "tailwindcss";
 
 @source "../html/**/*.html";
+@source "../sidepanel/**/*.{ts,tsx}";
+
+@layer components {
+  .app-button {
+    @apply cursor-pointer rounded-md px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-70;
+  }
+
+  .app-button-block {
+    @apply block w-full text-center;
+  }
+
+  .app-button-primary {
+    @apply bg-indigo-500 focus-visible:outline-indigo-500 enabled:hover:bg-indigo-400;
+  }
+
+  .app-button-secondary {
+    @apply bg-white/10 focus-visible:outline-indigo-500 enabled:hover:bg-white/20;
+  }
+
+  .app-button-outline {
+    @apply border border-white/15 bg-white/5 focus-visible:outline-white enabled:hover:bg-white/10;
+  }
+
+  .app-button-danger {
+    @apply bg-red-700 focus-visible:outline-red-500 enabled:hover:bg-red-400;
+  }
+}

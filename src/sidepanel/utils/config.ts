@@ -6,12 +6,12 @@ export function getApiBase(isTestMode: boolean): string {
 
 export function getSubmitFPUrl(isTestMode: boolean, token: string): string {
   return `${getApiBase(isTestMode)}${SUBMIT_FP_PATH}?token=${encodeURIComponent(
-    token
+    token,
   )}`;
 }
 
 export function getNewTabUrlPatterns(isTestMode: boolean): string[] {
   return isTestMode
-    ? ["*://localhost:3000/*"]
+    ? ["http://localhost:3000/*"]
     : ["*://fidsty.com/*", "*://*.fidsty.com/*"];
 }
