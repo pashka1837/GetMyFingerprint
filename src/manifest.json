@@ -32,6 +32,7 @@
 	"host_permissions": [
 		"*://onlyfans.com/*",
 		"*://*.onlyfans.com/*",
+		"*://localhost:3000/*",
 		"*://fidsty.com/*",
 		"*://*.fidsty.com/*"
 	]

