@@ -1,77 +1,124 @@
-import {
-  FailedFPPayload,
-  FingerprintPayload,
-  FingerprintResult,
-} from "../types";
+import { FingerprintPayload, FingerprintResult } from "../types";
 import { ONLYFANS_URL } from "../utils/const";
 import { FidstyClientError } from "../utils/errors";
+
+type OnlyfansPageAuthSnapshot = {
+  isAuth: boolean;
+  isReady: boolean;
+};
+
+type OnlyfansPageState = {
+  authUser: FingerprintResult["authUser"] | null;
+  bcTokenSha: string | null;
+  isAuth: boolean;
+  userAgent: string | null;
+  userId: FingerprintResult["userId"] | null;
+};
+
+export async function readOnlyfansPageAuthSnapshot(
+  tabId: number,
+): Promise<OnlyfansPageAuthSnapshot | null> {
+  const executed = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    func: (): OnlyfansPageAuthSnapshot => {
+      const app: any = document.getElementById("app");
+      const vue = app?.__vue__;
+
+      if (!vue) {
+        return {
+          isAuth: false,
+          isReady: false,
+        };
+      }
+
+      return {
+        isAuth: Boolean(vue?.isAuth),
+        isReady: true,
+      };
+    },
+  });
+
+  return executed[0]?.result ?? null;
+}
+
+async function getOnlyfansPageState(
+  tabId: number,
+  waitMs = 500,
+  maxWaitSeconds = 10,
+): Promise<OnlyfansPageState | null> {
+  const executed = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    args: [waitMs, maxWaitSeconds],
+    func: async (
+      waitMs: number,
+      maxWaitSeconds: number,
+    ): Promise<OnlyfansPageState | null> => {
+      const beginAt = Date.now();
+      const wait = (ms: number) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
+
+      while (Date.now() - beginAt <= maxWaitSeconds * 1000) {
+        const app: any = document.getElementById("app");
+        if (!app) {
+          await wait(waitMs);
+          continue;
+        }
+
+        const vue = app.__vue__;
+        if (!vue) {
+          await wait(waitMs);
+          continue;
+        }
+
+        const authUser = vue?.authUser ?? null;
+
+        return {
+          authUser,
+          bcTokenSha: localStorage.getItem("bcTokenSha"),
+          isAuth: Boolean(vue?.isAuth),
+          userAgent: navigator.userAgent ?? null,
+          userId: authUser?.id ?? null,
+        };
+      }
+
+      return null;
+    },
+  });
+
+  return executed[0]?.result ?? null;
+}
 
 export async function collectFingerprint(
   tabId: number,
 ): Promise<FingerprintPayload> {
   try {
-    const executed = await chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      world: "MAIN",
-      func: async (): Promise<FingerprintResult | { message: string }> => {
-        const wait = (ms: number) =>
-          new Promise((resolve) => setTimeout(resolve, ms));
+    const pageState = await getOnlyfansPageState(tabId, 500, 10);
 
-        while (true) {
-          const app: any = document.getElementById("app");
-          if (!app) {
-            await wait(100);
-            continue;
-          }
+    if (!pageState)
+      throw new FidstyClientError("Unable to retrieve login data. Try again.");
 
-          const vue = app.__vue__;
-
-          if (!vue) {
-            await wait(100);
-            continue;
-          }
-
-          const isAuth = vue?.isAuth;
-
-          if (!isAuth)
-            return {
-              message: "You are not logged in. Please login before submitting.",
-            };
-
-          const authUser = vue?.authUser;
-          const userId = authUser?.id;
-          const userAgent = navigator.userAgent;
-          const bcTokenSha = localStorage.getItem("bcTokenSha");
-
-          if (!authUser || !userId || !userAgent || !bcTokenSha)
-            return {
-              message: "Unable to retrieve login data. Try again.",
-            };
-
-          return {
-            authUser,
-            userAgent,
-            bcTokenSha,
-            userId,
-          };
-        }
-      },
-    });
-
-    const fingerprintResult = executed[0]?.result;
-    if (!fingerprintResult || "message" in fingerprintResult)
+    if (!pageState.isAuth)
       throw new FidstyClientError(
-        fingerprintResult?.message ||
-          "Unable to retrieve login data. Try again.",
+        "You are not logged in. Please login before submitting.",
       );
+
+    const { authUser, bcTokenSha, userAgent, userId } = pageState;
+
+    if (!authUser || !userId || !userAgent || !bcTokenSha)
+      throw new FidstyClientError("Unable to retrieve login data. Try again.");
 
     const cookies = await chrome.cookies.getAll({
       url: ONLYFANS_URL,
     });
 
     return {
-      ...fingerprintResult,
+      authUser,
+      bcTokenSha,
       cookies,
+      userAgent,
+      userId,
     };
   } catch (error) {
     throw error;
@@ -133,8 +180,9 @@ export async function focusMatchingTab(
     target: { tabId: tabId },
     world: "MAIN",
     func: (payload: any) => {
-      // TODO: уведомить сайт о перехвате отпечатка
+      // TODO: notify the site about intercepted fingerprint
     },
     args: [fingerprint],
   });
 }
+

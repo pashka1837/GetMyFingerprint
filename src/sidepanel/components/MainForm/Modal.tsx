@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { SubmitEvent, useCallback, useEffect, useRef, useState } from "react";
 import { FingerprintPayload } from "../../types";
 import { toast } from "sonner";
 import {
@@ -19,20 +19,12 @@ const IS_DEV = import.meta.env.DEV;
 export function Modal({ handleClose, isOpen, fingerprint }: ModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [token, setToken] = useState("");
 
   useEffect(() => {
-    if (!isOpen) {
-      setToken("");
-      return;
-    }
-
     inputRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        handleClose();
-      }
+      if (event.key === "Escape") handleClose();
     };
 
     document.addEventListener("keydown", onKeyDown);
@@ -63,35 +55,50 @@ export function Modal({ handleClose, isOpen, fingerprint }: ModalProps) {
   }, [fingerprint]);
 
   const handleFidstySubmit = useCallback(
-    async (token: string) => {
+    async (event: SubmitEvent<HTMLFormElement>) => {
+      event.preventDefault();
       setIsSubmitting(true);
+
+      const formData = new FormData(event.target as HTMLFormElement);
+      const token = String(formData.get("fidsty-token") || "").trim();
+
+      if (!token) {
+        inputRef.current?.reportValidity();
+        inputRef.current?.focus();
+        toast.error("Token is required");
+        setIsSubmitting(false);
+        return;
+      }
 
       let response: Response;
 
-      // try {
-      //   response = await fetch(getSubmitFPUrl(IS_DEV, token), {
-      //     method: "POST",
-      //     headers: {
-      //       "Content-Type": "application/json",
-      //     },
-      //     body: JSON.stringify(fingerprint),
-      //   });
-      // } catch (error) {
-      //   if (error instanceof Error) {
-      //     console.error(error.message);
-      //   } else {
-      //     console.error(error);
-      //   }
-      //   toast.error("Failed to submit login data");
-      //   setIsSubmitting(false);
-      //   return;
-      // }
+      try {
+        response = await fetch(getSubmitFPUrl(IS_DEV), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ fingerprint, token }),
+        });
+      } catch (error) {
+        if (error instanceof Error) console.error(error.message);
+        else console.error(error);
 
-      // if (!response.ok) {
-      //   toast.error("Failed to submit login data");
-      //   setIsSubmitting(false);
-      //   return;
-      // }
+        toast.error("Failed to submit login data.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!response.ok) {
+        toast.error(
+          response.statusText
+            ? response.statusText
+            : "Failed to submit login data.",
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       toast.success("Login data submitted successfully");
 
       try {
@@ -99,6 +106,8 @@ export function Modal({ handleClose, isOpen, fingerprint }: ModalProps) {
       } catch (error) {
         console.error(error);
       }
+
+      setIsSubmitting(false);
 
       setTimeout(() => {
         window.close();
@@ -119,8 +128,8 @@ export function Modal({ handleClose, isOpen, fingerprint }: ModalProps) {
         }
       }}
     >
-      <div className="w-full max-w-md rounded-2xl bg-gray-900 p-6 shadow-2xl ring-1 ring-white/10">
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="w-full max-w-md rounded-2xl bg-gray-900 p-6 shadow-2xl ring-1 ring-white/10 space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             className="app-button app-button-secondary"
             onClick={handleDownloadFingerprint}
@@ -136,31 +145,26 @@ export function Modal({ handleClose, isOpen, fingerprint }: ModalProps) {
             Copy to clipboard
           </button>
         </div>
+        <div className="flex items-center justify-center text-gray-400 select-none">
+          <hr className="flex-1 mr-1" />
+          <span className="font-semibold"> or </span>
+          <hr className="flex-1 ml-1" />
+        </div>
         <form
-          className="mt-6 space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-
-            const trimmedToken = token.trim();
-            if (!trimmedToken) {
-              inputRef.current?.reportValidity();
-              inputRef.current?.focus();
-              return;
-            }
-
-            void handleFidstySubmit(trimmedToken);
-          }}
+          action="#"
+          className="space-y-3"
+          method="POST"
+          onSubmit={handleFidstySubmit}
         >
           <div>
             <input
               ref={inputRef}
               className="mt-2 block w-full rounded-md border-0 bg-white/5 px-3.5 py-2.5 text-sm text-white inset-ring inset-ring-white/10 placeholder:text-gray-500 focus:bg-white/10 focus:outline-2 focus:outline-offset-2 focus:outline-indigo-500"
-              id="token-input"
-              onChange={(event) => setToken(event.target.value)}
+              id="fidsty-token"
+              name="fidsty-token"
               placeholder="Paste token here"
               required
               type="text"
-              value={token}
             />
           </div>
           <button

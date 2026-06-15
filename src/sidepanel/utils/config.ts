@@ -4,10 +4,8 @@ export function getApiBase(isTestMode: boolean): string {
   return isTestMode ? TEST_SUBMIT_BASE : PROD_SUBMIT_BASE;
 }
 
-export function getSubmitFPUrl(isTestMode: boolean, token: string): string {
-  return `${getApiBase(isTestMode)}${SUBMIT_FP_PATH}?token=${encodeURIComponent(
-    token,
-  )}`;
+export function getSubmitFPUrl(isTestMode: boolean): string {
+  return `${getApiBase(isTestMode)}${SUBMIT_FP_PATH}`;
 }
 
 export function getNewTabUrlPatterns(isTestMode: boolean): string[] {

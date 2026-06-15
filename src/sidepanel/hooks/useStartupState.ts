@@ -1,101 +1,137 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCheckPage } from "./useCheckPage";
-import {
-  clearOnlyfansCookies,
-  getOnlyfansCookies,
-  hasOnlyfansAuthCookies,
-  refreshOnlyfansTab,
-} from "../lib/pageSetup";
+import { clearOnlyfansCookies, refreshOnlyfansTab } from "../lib/pageSetup";
+import { readOnlyfansPageAuthSnapshot } from "../lib/fingerprint";
+
+const AUTH_POLL_INTERVAL_MS = 1500;
 
 export type StartupViewState =
   | "open_tab_prompt"
   | "loading"
   | "signed_in_warning"
+  | "awaiting_login"
   | "main_form";
 
 export function useStartupState() {
-  const { pageId, openPage } = useCheckPage();
-  const [hasOnlyfansAuthState, setHasOnlyfansAuthState] = useState(false);
-  const [isCheckingCookies, setIsCheckingCookies] = useState(false);
-  const [isOpeningPage, setIsOpeningPage] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isWarningDismissed, setIsWarningDismissed] = useState(false);
+  const { pageId, pageVersion, openPage } = useCheckPage();
+  const [isPageAuthenticated, setIsPageAuthenticated] = useState(false);
+  const [isWarningVisible, setIsWarningVisible] = useState(false);
   const [cookiesCheckVersion, setCookiesCheckVersion] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const trackedTabIdRef = useRef<number | null>(null);
+  const warningConsumedForCurrentTabRef = useRef(false);
+
+  const syncAuthState = useCallback((isAuthenticated: boolean) => {
+    setIsPageAuthenticated(isAuthenticated);
+
+    if (!isAuthenticated) {
+      setIsWarningVisible(false);
+      return;
+    }
+
+    if (!warningConsumedForCurrentTabRef.current) {
+      warningConsumedForCurrentTabRef.current = true;
+      setIsWarningVisible(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (trackedTabIdRef.current === pageId) {
+      return;
+    }
+
+    trackedTabIdRef.current = pageId;
+    warningConsumedForCurrentTabRef.current = false;
+    setIsWarningVisible(false);
+  }, [pageId]);
 
   useEffect(() => {
     let isMounted = true;
 
     if (pageId === null) {
-      setHasOnlyfansAuthState(false);
-      setIsCheckingCookies(false);
+      setIsPageAuthenticated(false);
+      setIsWarningVisible(false);
+      setIsLoading(false);
       return () => {
         isMounted = false;
       };
     }
 
-    if (isWarningDismissed) {
-      setIsCheckingCookies(false);
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    const detectCookies = async () => {
-      setIsCheckingCookies(true);
+    const detectInitialAuthState = async () => {
+      let pageAuthState = false;
 
       try {
-        const cookies = await getOnlyfansCookies();
-
-        if (!isMounted) {
-          return;
-        }
-
-        setHasOnlyfansAuthState(hasOnlyfansAuthCookies(cookies));
+        const snapshot = await readOnlyfansPageAuthSnapshot(pageId);
+        pageAuthState = Boolean(snapshot?.isReady && snapshot.isAuth);
       } catch {
-        if (!isMounted) {
-          return;
-        }
-
-        setHasOnlyfansAuthState(false);
-        toast.error("Unable to check onlyfans.com cookies.");
-      } finally {
-        if (isMounted) {
-          setIsCheckingCookies(false);
-        }
+        pageAuthState = false;
       }
+
+      if (!isMounted) return;
+
+      syncAuthState(pageAuthState);
     };
 
-    detectCookies();
+    void detectInitialAuthState();
 
     return () => {
       isMounted = false;
     };
-  }, [cookiesCheckVersion, isWarningDismissed, pageId]);
+  }, [cookiesCheckVersion, pageId, pageVersion, syncAuthState]);
+
+  useEffect(() => {
+    if (pageId === null) return;
+
+    let isMounted = true;
+
+    const pollSessionState = async () => {
+      try {
+        const snapshot = await readOnlyfansPageAuthSnapshot(pageId);
+        if (!isMounted || !snapshot?.isReady) {
+          return;
+        }
+
+        syncAuthState(snapshot.isAuth);
+      } catch {
+        // Ignore transient scripting failures while the page reloads.
+      }
+    };
+
+    void pollSessionState();
+
+    const intervalId = window.setInterval(() => {
+      void pollSessionState();
+    }, AUTH_POLL_INTERVAL_MS);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [pageId, pageVersion, syncAuthState]);
 
   const handleOpenOnlyfans = useCallback(async () => {
-    setIsOpeningPage(true);
+    setIsLoading(true);
 
     try {
       await openPage();
     } catch {
       toast.error("Unable to open onlyfans.com.");
     } finally {
-      setIsOpeningPage(false);
+      setIsLoading(false);
     }
   }, [openPage]);
 
   const handleWarningCancel = useCallback(() => {
-    setIsWarningDismissed(true);
+    setIsWarningVisible(false);
   }, []);
 
   const handleLogout = useCallback(async () => {
-    if (pageId === null) {
-      return;
-    }
+    if (pageId === null) return;
 
-    setIsLoggingOut(true);
-    setIsWarningDismissed(false);
+    setIsLoading(true);
+    setIsPageAuthenticated(false);
+    setIsWarningVisible(false);
 
     try {
       await clearOnlyfansCookies();
@@ -104,31 +140,22 @@ export function useStartupState() {
     } catch {
       toast.error("Unable to log out from onlyfans.com.");
     } finally {
-      setIsLoggingOut(false);
+      setIsLoading(false);
     }
   }, [pageId]);
 
   const viewState = useMemo<StartupViewState>(() => {
-    if (pageId === null) {
-      return "open_tab_prompt";
-    }
-
-    if (isCheckingCookies) {
-      return "loading";
-    }
-
-    if (hasOnlyfansAuthState && !isWarningDismissed) {
-      return "signed_in_warning";
-    }
-
+    if (pageId === null) return "open_tab_prompt";
+    if (isLoading) return "loading";
+    if (isPageAuthenticated && isWarningVisible) return "signed_in_warning";
+    if (!isPageAuthenticated) return "awaiting_login";
     return "main_form";
-  }, [hasOnlyfansAuthState, isCheckingCookies, isWarningDismissed, pageId]);
+  }, [isLoading, isPageAuthenticated, isWarningVisible, pageId]);
 
   return {
     pageId,
     viewState,
-    isOpeningPage,
-    isLoggingOut,
+    isLoading,
     handleOpenOnlyfans,
     handleWarningCancel,
     handleLogout,

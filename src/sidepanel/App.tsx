@@ -1,4 +1,5 @@
 import { Toaster } from "sonner";
+import { AwaitLoginView } from "./components/AwaitLoginView";
 import { CheckingSessionView } from "./components/CheckingSessionView";
 import { MainFormView } from "./components/MainForm/MainFormView";
 import { OpenOnlyfansPrompt } from "./components/OpenOnlyfansPrompt";
@@ -9,8 +10,7 @@ export function App() {
   const {
     pageId,
     viewState,
-    isOpeningPage,
-    isLoggingOut,
+    isLoading,
     handleOpenOnlyfans,
     handleWarningCancel,
     handleLogout,
@@ -20,7 +20,7 @@ export function App() {
 
   return (
     <>
-      <div className="isolate flex min-h-screen flex-col items-center justify-center bg-gray-900 p-6 lg:p-8 ">
+      <div className="isolate min-h-screen flex flex-col items-center justify-center bg-gray-900 p-6 lg:p-8 ">
         <div
           aria-hidden="true"
           className="absolute inset-x-0 -top-40 -z-10 overflow-hidden blur-3xl sm:-top-80"
@@ -36,7 +36,7 @@ export function App() {
 
         {viewState === "open_tab_prompt" && (
           <OpenOnlyfansPrompt
-            isOpeningPage={isOpeningPage}
+            isOpeningPage={isLoading}
             onOpen={handleOpenOnlyfans}
           />
         )}
@@ -45,11 +45,13 @@ export function App() {
 
         {viewState === "signed_in_warning" && (
           <SignedInWarningView
-            isLoggingOut={isLoggingOut}
+            isLoggingOut={isLoading}
             onCancel={handleWarningCancel}
             onLogout={handleLogout}
           />
         )}
+
+        {viewState === "awaiting_login" && <AwaitLoginView />}
 
         {viewState === "main_form" && pageId && <MainFormView tabId={pageId} />}
       </div>

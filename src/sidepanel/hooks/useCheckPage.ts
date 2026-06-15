@@ -7,10 +7,14 @@ import {
 
 export function useCheckPage() {
   const [pageId, setPageId] = useState<number | null>(null);
+  const [pageVersion, setPageVersion] = useState(0);
   const pageIdRef = useRef<number | null>(null);
   const syncPageId = useCallback((nextPageId: number | null) => {
     pageIdRef.current = nextPageId;
     setPageId(nextPageId);
+  }, []);
+  const bumpPageVersion = useCallback(() => {
+    setPageVersion((value) => value + 1);
   }, []);
 
   const openPage = useCallback(async () => {
@@ -62,6 +66,7 @@ export function useCheckPage() {
 
       if (isOnlyfansUrl(tab.url)) {
         syncPageId(tabId);
+        bumpPageVersion();
         return;
       }
 
@@ -71,6 +76,7 @@ export function useCheckPage() {
         if (!isMounted) return;
 
         syncPageId(nextTab?.id ?? null);
+        bumpPageVersion();
       }
     };
 
@@ -83,7 +89,7 @@ export function useCheckPage() {
       chrome.tabs.onRemoved.removeListener(handleTabRemoved);
       chrome.tabs.onUpdated.removeListener(handleTabUpdated);
     };
-  }, [syncPageId]);
+  }, [bumpPageVersion, syncPageId]);
 
-  return { pageId, openPage };
+  return { pageId, pageVersion, openPage };
 }
