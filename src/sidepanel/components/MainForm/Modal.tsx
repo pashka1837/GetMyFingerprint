@@ -89,23 +89,26 @@ export function Modal({ handleClose, isOpen, fingerprint }: ModalProps) {
         return;
       }
 
-      if (!response.ok) {
-        toast.error(
-          response.statusText
-            ? response.statusText
-            : "Failed to submit login data.",
-        );
+      try {
+        const data = await response.json();
+        if (!response.ok) {
+          toast.error(data?.message || "Failed to submit login data.");
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (error) {
+        toast.error("Failed to submit login data.");
         setIsSubmitting(false);
         return;
       }
 
       toast.success("Login data submitted successfully");
 
-      try {
-        await focusMatchingTab(getNewTabUrlPatterns(IS_DEV), fingerprint);
-      } catch (error) {
-        console.error(error);
-      }
+      // try {
+      //   await focusMatchingTab(getNewTabUrlPatterns(IS_DEV), fingerprint);
+      // } catch (error) {
+      //   console.error(error);
+      // }
 
       setIsSubmitting(false);
 
