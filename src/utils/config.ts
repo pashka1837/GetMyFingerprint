@@ -8,8 +8,8 @@ export function getSubmitFPUrl(isTestMode: boolean): string {
   return `${getApiBase(isTestMode)}${SUBMIT_FP_PATH}`;
 }
 
-export function getNewTabUrlPatterns(isTestMode: boolean): string[] {
-  return isTestMode
-    ? ["http://localhost:3000/*"]
-    : ["*://fidsty.com/*", "*://*.fidsty.com/*"];
-}
+// export function getNewTabUrlPatterns(isTestMode: boolean): string[] {
+//   return isTestMode
+//     ? ["http://localhost:3000/*"]
+//     : ["*://fidsty.com/*", "*://*.fidsty.com/*"];
+// }

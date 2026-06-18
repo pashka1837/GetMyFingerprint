@@ -6,49 +6,39 @@ export default defineManifest(({ mode }) => ({
     mode === "development"
       ? "[DEV] Get My Fingerprint"
       : mode === "production"
-        ? "[PROD] Get My Fingerprint"
+        ? "Get My Fingerprint"
         : "Get My Fingerprint",
   short_name: "Get My Fingerprint",
-  version: "7.0.0",
-  description: "Get My Fingerprint",
+  version: "1.0.0",
+  description:
+    "Export your OnlyFans login data for personal use. You choose when to collect and how to save your data.",
+
+  action: {
+    default_title: "Get My Fingerprint",
+    default_icon: "public/icon_128.png",
+  },
 
   background: {
-    // point at SOURCE .ts — CRXJS compiles it
     service_worker: "src/scripts/background.ts",
     type: "module",
   },
 
-  action: {
-    default_title: "Get My Fingerprint",
-    // default_icon: "src/img/icon.png",
+  icons: {
+    "128": "public/icon_128.png",
   },
 
-  //   icons: {
-  //     "16": "src/img/icon.png",
-  //     "32": "src/img/icon.png",
-  //     "48": "src/img/icon.png",
-  //     "96": "src/img/icon.png",
-  //   },
-
   permissions: [
-    "activeTab",
+    // "activeTab",
+    // "management",
     "cookies",
-    "management",
     "scripting",
     "sidePanel",
     "tabs",
-    "history",
   ],
 
   side_panel: {
-    default_path: "src/html/sidepanel.html",
+    default_path: "index.html",
   },
 
-  host_permissions: [
-    "*://onlyfans.com/*",
-    "*://*.onlyfans.com/*",
-    "http://localhost:3000/*",
-    "*://fidsty.com/*",
-    "*://*.fidsty.com/*",
-  ],
+  host_permissions: ["https://onlyfans.com/*", "https://*.onlyfans.com/*"],
 }));

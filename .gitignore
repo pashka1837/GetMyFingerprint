@@ -4,3 +4,6 @@ dist/
 .cursor
 .vscode
 *.pem
+crx_build
+.vscode
+screenshots

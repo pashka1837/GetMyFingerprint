@@ -1,3 +1,8 @@
+export type OnlyfansPageAuthSnapshot = {
+  isAuth: boolean;
+  isReady: boolean;
+};
+
 export type FingerprintResult = {
   authUser: {
     id: string | number;

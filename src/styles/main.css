@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
-@source "../html/**/*.html";
-@source "../sidepanel/**/*.{ts,tsx}";
+@source "../App.tsx";
+@source "../components/**/*.{ts,tsx}";
+@source "../hooks/**/*.{ts,tsx}";
+@source "../../index.html";
 
 @layer components {
   .app-button {

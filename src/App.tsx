@@ -16,8 +16,6 @@ export function App() {
     handleLogout,
   } = useStartupState();
 
-  console.log("viewState", viewState);
-
   return (
     <>
       <div className="isolate min-h-screen flex flex-col items-center justify-center bg-gray-900 p-6 lg:p-8 ">

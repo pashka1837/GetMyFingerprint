@@ -1,3 +1,4 @@
+import { OnlyfansPageAuthSnapshot } from "../types";
 import { ONLYFANS_URL } from "../utils/const";
 import { FidstyClientError } from "../utils/errors";
 
@@ -62,6 +63,33 @@ export async function ensureOnlyfansTab() {
   }
 }
 
+export async function readOnlyfansPageAuthSnapshot(
+  tabId: number,
+): Promise<OnlyfansPageAuthSnapshot | null> {
+  const executed = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    func: (): OnlyfansPageAuthSnapshot => {
+      const app: any = document.getElementById("app");
+      const vue = app?.__vue__;
+
+      if (!vue) {
+        return {
+          isAuth: false,
+          isReady: false,
+        };
+      }
+
+      return {
+        isAuth: Boolean(vue?.isAuth),
+        isReady: true,
+      };
+    },
+  });
+
+  return executed[0]?.result ?? null;
+}
+
 export async function getPageId() {
   const { tabId } = await ensureOnlyfansTab();
   return tabId;
@@ -71,15 +99,6 @@ export async function getOnlyfansCookies() {
   return chrome.cookies.getAll({
     url: ONLYFANS_URL,
   });
-}
-
-export function hasOnlyfansAuthCookies(cookies: chrome.cookies.Cookie[]) {
-  const authIdCookie = cookies.find((cookie) => cookie.name === "auth_id");
-  const authId = authIdCookie?.value?.trim();
-
-  if (!authId) return false;
-
-  return true;
 }
 
 function getCookieUrl(cookie: chrome.cookies.Cookie) {

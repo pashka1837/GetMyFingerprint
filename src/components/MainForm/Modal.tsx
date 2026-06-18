@@ -4,9 +4,8 @@ import { toast } from "sonner";
 import {
   copyFingerprintToClipboard,
   downloadFingerprint,
-  focusMatchingTab,
 } from "../../lib/fingerprint";
-import { getNewTabUrlPatterns, getSubmitFPUrl } from "../../utils/config";
+import { getSubmitFPUrl } from "../../utils/config";
 
 type ModalProps = {
   isOpen: boolean;
@@ -103,12 +102,6 @@ export function Modal({ handleClose, isOpen, fingerprint }: ModalProps) {
       }
 
       toast.success("Login data submitted successfully");
-
-      // try {
-      //   await focusMatchingTab(getNewTabUrlPatterns(IS_DEV), fingerprint);
-      // } catch (error) {
-      //   console.error(error);
-      // }
 
       setIsSubmitting(false);
 

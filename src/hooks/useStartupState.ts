@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCheckPage } from "./useCheckPage";
-import { clearOnlyfansCookies, refreshOnlyfansTab } from "../lib/pageSetup";
-import { readOnlyfansPageAuthSnapshot } from "../lib/fingerprint";
+import {
+  clearOnlyfansCookies,
+  refreshOnlyfansTab,
+  readOnlyfansPageAuthSnapshot,
+} from "../lib/pageSetup";
+import type { OnlyfansPageAuthSnapshot } from "../types";
 
 const AUTH_POLL_INTERVAL_MS = 1500;
 
@@ -21,6 +25,15 @@ export function useStartupState() {
   const [isLoading, setIsLoading] = useState(false);
   const trackedTabIdRef = useRef<number | null>(null);
   const warningConsumedForCurrentTabRef = useRef(false);
+  const firstReadyAuthResolvedRef = useRef(false);
+  const wasAuthenticatedOnFirstReadyRef = useRef(false);
+
+  const resetAuthTracking = useCallback(() => {
+    warningConsumedForCurrentTabRef.current = false;
+    firstReadyAuthResolvedRef.current = false;
+    wasAuthenticatedOnFirstReadyRef.current = false;
+    setIsWarningVisible(false);
+  }, []);
 
   const syncAuthState = useCallback((isAuthenticated: boolean) => {
     setIsPageAuthenticated(isAuthenticated);
@@ -30,11 +43,28 @@ export function useStartupState() {
       return;
     }
 
-    if (!warningConsumedForCurrentTabRef.current) {
+    if (
+      wasAuthenticatedOnFirstReadyRef.current &&
+      !warningConsumedForCurrentTabRef.current
+    ) {
       warningConsumedForCurrentTabRef.current = true;
       setIsWarningVisible(true);
     }
   }, []);
+
+  const handleAuthSnapshot = useCallback(
+    (snapshot: OnlyfansPageAuthSnapshot | null) => {
+      if (!snapshot?.isReady) return;
+
+      if (!firstReadyAuthResolvedRef.current) {
+        firstReadyAuthResolvedRef.current = true;
+        wasAuthenticatedOnFirstReadyRef.current = snapshot.isAuth;
+      }
+
+      syncAuthState(snapshot.isAuth);
+    },
+    [syncAuthState],
+  );
 
   useEffect(() => {
     if (trackedTabIdRef.current === pageId) {
@@ -42,9 +72,8 @@ export function useStartupState() {
     }
 
     trackedTabIdRef.current = pageId;
-    warningConsumedForCurrentTabRef.current = false;
-    setIsWarningVisible(false);
-  }, [pageId]);
+    resetAuthTracking();
+  }, [pageId, resetAuthTracking]);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,18 +88,14 @@ export function useStartupState() {
     }
 
     const detectInitialAuthState = async () => {
-      let pageAuthState = false;
-
       try {
         const snapshot = await readOnlyfansPageAuthSnapshot(pageId);
-        pageAuthState = Boolean(snapshot?.isReady && snapshot.isAuth);
+        if (!isMounted) return;
+
+        handleAuthSnapshot(snapshot);
       } catch {
-        pageAuthState = false;
+        // Ignore transient scripting failures while the page reloads.
       }
-
-      if (!isMounted) return;
-
-      syncAuthState(pageAuthState);
     };
 
     void detectInitialAuthState();
@@ -78,7 +103,7 @@ export function useStartupState() {
     return () => {
       isMounted = false;
     };
-  }, [cookiesCheckVersion, pageId, pageVersion, syncAuthState]);
+  }, [cookiesCheckVersion, handleAuthSnapshot, pageId, pageVersion]);
 
   useEffect(() => {
     if (pageId === null) return;
@@ -88,11 +113,9 @@ export function useStartupState() {
     const pollSessionState = async () => {
       try {
         const snapshot = await readOnlyfansPageAuthSnapshot(pageId);
-        if (!isMounted || !snapshot?.isReady) {
-          return;
-        }
+        if (!isMounted) return;
 
-        syncAuthState(snapshot.isAuth);
+        handleAuthSnapshot(snapshot);
       } catch {
         // Ignore transient scripting failures while the page reloads.
       }
@@ -108,7 +131,7 @@ export function useStartupState() {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [pageId, pageVersion, syncAuthState]);
+  }, [handleAuthSnapshot, pageId, pageVersion]);
 
   const handleOpenOnlyfans = useCallback(async () => {
     setIsLoading(true);
@@ -131,7 +154,7 @@ export function useStartupState() {
 
     setIsLoading(true);
     setIsPageAuthenticated(false);
-    setIsWarningVisible(false);
+    resetAuthTracking();
 
     try {
       await clearOnlyfansCookies();
@@ -142,7 +165,7 @@ export function useStartupState() {
     } finally {
       setIsLoading(false);
     }
-  }, [pageId]);
+  }, [pageId, resetAuthTracking]);
 
   const viewState = useMemo<StartupViewState>(() => {
     if (pageId === null) return "open_tab_prompt";
