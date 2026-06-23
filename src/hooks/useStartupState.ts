@@ -8,7 +8,7 @@ import {
 } from "../lib/pageSetup";
 import type { OnlyfansPageAuthSnapshot } from "../types";
 
-const AUTH_POLL_INTERVAL_MS = 1500;
+const AUTH_POLL_INTERVAL_MS = 500;
 
 export type StartupViewState =
   | "open_tab_prompt"
@@ -67,10 +67,7 @@ export function useStartupState() {
   );
 
   useEffect(() => {
-    if (trackedTabIdRef.current === pageId) {
-      return;
-    }
-
+    if (trackedTabIdRef.current === pageId) return;
     trackedTabIdRef.current = pageId;
     resetAuthTracking();
   }, [pageId, resetAuthTracking]);
@@ -87,38 +84,12 @@ export function useStartupState() {
       };
     }
 
-    const detectInitialAuthState = async () => {
-      try {
-        const snapshot = await readOnlyfansPageAuthSnapshot(pageId);
-        if (!isMounted) return;
-
-        handleAuthSnapshot(snapshot);
-      } catch {
-        // Ignore transient scripting failures while the page reloads.
-      }
-    };
-
-    void detectInitialAuthState();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [cookiesCheckVersion, handleAuthSnapshot, pageId, pageVersion]);
-
-  useEffect(() => {
-    if (pageId === null) return;
-
-    let isMounted = true;
-
     const pollSessionState = async () => {
       try {
         const snapshot = await readOnlyfansPageAuthSnapshot(pageId);
         if (!isMounted) return;
-
         handleAuthSnapshot(snapshot);
-      } catch {
-        // Ignore transient scripting failures while the page reloads.
-      }
+      } catch {}
     };
 
     void pollSessionState();
@@ -131,7 +102,7 @@ export function useStartupState() {
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [handleAuthSnapshot, pageId, pageVersion]);
+  }, [cookiesCheckVersion, handleAuthSnapshot, pageId, pageVersion]);
 
   const handleOpenOnlyfans = useCallback(async () => {
     setIsLoading(true);
