@@ -6,14 +6,14 @@ export default defineManifest(({ mode }) => ({
     mode === "production"
       ? "Fidsty Analytics Connector"
       : "[DEV] Fidsty Analytics Connector",
-  short_name: "Fidsty AC",
+  short_name: "Fidsty Analytics Connector",
   version: "1.0.0",
   description:
     "Connect your OnlyFans account to Fidsty Analytics. The extension uses your authorization session only when you explicitly approve account linking.",
 
   action: {
-    default_title: "Get My Fingerprint",
-    default_icon: "public/icon_128.png",
+    default_title: "Fidsty Analytics Connector",
+    default_icon: "icons/icon_128.png",
   },
 
   background: {
@@ -21,8 +21,16 @@ export default defineManifest(({ mode }) => ({
     type: "module",
   },
 
+  content_scripts: [
+    {
+      matches: ["https://onlyfans.com/*"],
+      js: ["src/scripts/content/authWatcher.ts"],
+      run_at: "document_idle",
+    },
+  ],
+
   icons: {
-    "128": "public/icon_128.png",
+    "128": "icons/icon_128.png",
   },
 
   permissions: ["cookies", "scripting", "sidePanel", "tabs"],
@@ -32,4 +40,11 @@ export default defineManifest(({ mode }) => ({
   },
 
   host_permissions: ["https://onlyfans.com/*"],
+
+  web_accessible_resources: [
+    {
+      matches: ["https://onlyfans.com/*"],
+      resources: ["readAuthBridge.js"],
+    },
+  ],
 }));

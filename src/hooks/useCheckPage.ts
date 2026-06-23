@@ -1,24 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  findOnlyfansTab,
-  isOnlyfansUrl,
-  openOnlyfansTab,
-} from "../lib/pageSetup";
+import { findTab, isCorrectUrl, openNewTab } from "../lib/pageSetup";
 
 export function useCheckPage() {
   const [pageId, setPageId] = useState<number | null>(null);
   const [pageVersion, setPageVersion] = useState(0);
   const pageIdRef = useRef<number | null>(null);
+
   const syncPageId = useCallback((nextPageId: number | null) => {
     pageIdRef.current = nextPageId;
     setPageId(nextPageId);
   }, []);
+
   const bumpPageVersion = useCallback(() => {
     setPageVersion((value) => value + 1);
   }, []);
 
   const openPage = useCallback(async () => {
-    const tabId = await openOnlyfansTab();
+    const tabId = await openNewTab();
     syncPageId(tabId);
     return tabId;
   }, [syncPageId]);
@@ -28,24 +26,19 @@ export function useCheckPage() {
 
     const detectInitialPage = async () => {
       try {
-        const tab = await findOnlyfansTab();
-
+        const tab = await findTab();
         if (!isMounted) return;
-
         syncPageId(tab?.id ?? null);
       } catch {
         if (!isMounted) return;
-
         syncPageId(null);
       }
     };
 
     const handleTabRemoved = async () => {
-      const tab = await findOnlyfansTab();
+      const tab = await findTab();
 
-      if (!isMounted) {
-        return;
-      }
+      if (!isMounted) return;
 
       if (!tab?.id) {
         if (pageIdRef.current !== null) {
@@ -64,17 +57,15 @@ export function useCheckPage() {
     ) => {
       if (changeInfo.status !== "complete") return;
 
-      if (isOnlyfansUrl(tab.url)) {
+      if (isCorrectUrl(tab.url)) {
         syncPageId(tabId);
         bumpPageVersion();
         return;
       }
 
       if (pageIdRef.current === tabId) {
-        const nextTab = await findOnlyfansTab();
-
+        const nextTab = await findTab();
         if (!isMounted) return;
-
         syncPageId(nextTab?.id ?? null);
         bumpPageVersion();
       }

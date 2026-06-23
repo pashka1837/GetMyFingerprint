@@ -1,6 +1,6 @@
 {
-  "name": "fingerprint-extention",
-  "description": "GetMyFingerprint",
+  "name": "fidsty-analytics-connector",
+  "description": "Fidsty Analytics Connector",
   "private": true,
   "main": "index.js",
   "type": "module",

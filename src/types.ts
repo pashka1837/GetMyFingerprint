@@ -1,3 +1,10 @@
+export type StartupViewState =
+  | "open_tab_prompt"
+  | "loading"
+  | "signed_in_warning"
+  | "awaiting_login"
+  | "main_form";
+
 export type OnlyfansPageAuthSnapshot = {
   isAuth: boolean;
   isReady: boolean;

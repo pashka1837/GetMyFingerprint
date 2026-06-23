@@ -1,69 +1,50 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import type { OnlyfansPageAuthSnapshot, StartupViewState } from "../types";
+import { useAuthSnapshot } from "./useAuthSnapshot";
 import { useCheckPage } from "./useCheckPage";
-import {
-  clearOnlyfansCookies,
-  refreshOnlyfansTab,
-  readOnlyfansPageAuthSnapshot,
-} from "../lib/pageSetup";
-import type { OnlyfansPageAuthSnapshot } from "../types";
-
-const AUTH_POLL_INTERVAL_MS = 500;
-
-export type StartupViewState =
-  | "open_tab_prompt"
-  | "loading"
-  | "signed_in_warning"
-  | "awaiting_login"
-  | "main_form";
+import { clearOnlyfansCookies, refreshOnlyfansTab } from "../lib/pageSetup";
 
 export function useStartupState() {
   const { pageId, pageVersion, openPage } = useCheckPage();
   const [isPageAuthenticated, setIsPageAuthenticated] = useState(false);
-  const [isWarningVisible, setIsWarningVisible] = useState(false);
-  const [cookiesCheckVersion, setCookiesCheckVersion] = useState(0);
+  const [isAuthedWarn, setIsAuthedWarn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
   const trackedTabIdRef = useRef<number | null>(null);
-  const warningConsumedForCurrentTabRef = useRef(false);
-  const firstReadyAuthResolvedRef = useRef(false);
-  const wasAuthenticatedOnFirstReadyRef = useRef(false);
+  const isAuthWarnConsumedRef = useRef(false);
+  const firstAuthReadyResolvedRef = useRef(false);
+  const wasAuthOnFirstReadyRef = useRef(false);
 
   const resetAuthTracking = useCallback(() => {
-    warningConsumedForCurrentTabRef.current = false;
-    firstReadyAuthResolvedRef.current = false;
-    wasAuthenticatedOnFirstReadyRef.current = false;
-    setIsWarningVisible(false);
-  }, []);
-
-  const syncAuthState = useCallback((isAuthenticated: boolean) => {
-    setIsPageAuthenticated(isAuthenticated);
-
-    if (!isAuthenticated) {
-      setIsWarningVisible(false);
-      return;
-    }
-
-    if (
-      wasAuthenticatedOnFirstReadyRef.current &&
-      !warningConsumedForCurrentTabRef.current
-    ) {
-      warningConsumedForCurrentTabRef.current = true;
-      setIsWarningVisible(true);
-    }
+    isAuthWarnConsumedRef.current = false;
+    firstAuthReadyResolvedRef.current = false;
+    wasAuthOnFirstReadyRef.current = false;
+    setIsAuthedWarn(false);
   }, []);
 
   const handleAuthSnapshot = useCallback(
     (snapshot: OnlyfansPageAuthSnapshot | null) => {
       if (!snapshot?.isReady) return;
 
-      if (!firstReadyAuthResolvedRef.current) {
-        firstReadyAuthResolvedRef.current = true;
-        wasAuthenticatedOnFirstReadyRef.current = snapshot.isAuth;
+      if (!firstAuthReadyResolvedRef.current) {
+        firstAuthReadyResolvedRef.current = true;
+        wasAuthOnFirstReadyRef.current = snapshot.isAuth;
       }
 
-      syncAuthState(snapshot.isAuth);
+      setIsPageAuthenticated(snapshot.isAuth);
+
+      if (!snapshot.isAuth) {
+        setIsAuthedWarn(false);
+        return;
+      }
+
+      if (wasAuthOnFirstReadyRef.current && !isAuthWarnConsumedRef.current) {
+        isAuthWarnConsumedRef.current = true;
+        setIsAuthedWarn(true);
+      }
     },
-    [syncAuthState],
+    [],
   );
 
   useEffect(() => {
@@ -73,36 +54,14 @@ export function useStartupState() {
   }, [pageId, resetAuthTracking]);
 
   useEffect(() => {
-    let isMounted = true;
+    if (pageId !== null) return;
 
-    if (pageId === null) {
-      setIsPageAuthenticated(false);
-      setIsWarningVisible(false);
-      setIsLoading(false);
-      return () => {
-        isMounted = false;
-      };
-    }
+    setIsPageAuthenticated(false);
+    setIsAuthedWarn(false);
+    setIsLoading(false);
+  }, [pageId]);
 
-    const pollSessionState = async () => {
-      try {
-        const snapshot = await readOnlyfansPageAuthSnapshot(pageId);
-        if (!isMounted) return;
-        handleAuthSnapshot(snapshot);
-      } catch {}
-    };
-
-    void pollSessionState();
-
-    const intervalId = window.setInterval(() => {
-      void pollSessionState();
-    }, AUTH_POLL_INTERVAL_MS);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [cookiesCheckVersion, handleAuthSnapshot, pageId, pageVersion]);
+  useAuthSnapshot(pageId, pageVersion, handleAuthSnapshot);
 
   const handleOpenOnlyfans = useCallback(async () => {
     setIsLoading(true);
@@ -117,20 +76,19 @@ export function useStartupState() {
   }, [openPage]);
 
   const handleWarningCancel = useCallback(() => {
-    setIsWarningVisible(false);
+    setIsAuthedWarn(false);
   }, []);
 
   const handleLogout = useCallback(async () => {
     if (pageId === null) return;
 
     setIsLoading(true);
-    setIsPageAuthenticated(false);
-    resetAuthTracking();
 
     try {
       await clearOnlyfansCookies();
       await refreshOnlyfansTab(pageId);
-      setCookiesCheckVersion((value) => value + 1);
+      setIsPageAuthenticated(false);
+      resetAuthTracking();
     } catch {
       toast.error("Unable to log out from onlyfans.com.");
     } finally {
@@ -141,10 +99,10 @@ export function useStartupState() {
   const viewState = useMemo<StartupViewState>(() => {
     if (pageId === null) return "open_tab_prompt";
     if (isLoading) return "loading";
-    if (isPageAuthenticated && isWarningVisible) return "signed_in_warning";
+    if (isPageAuthenticated && isAuthedWarn) return "signed_in_warning";
     if (!isPageAuthenticated) return "awaiting_login";
     return "main_form";
-  }, [isLoading, isPageAuthenticated, isWarningVisible, pageId]);
+  }, [isLoading, isPageAuthenticated, isAuthedWarn, pageId]);
 
   return {
     pageId,

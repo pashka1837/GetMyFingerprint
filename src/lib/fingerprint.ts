@@ -2,7 +2,7 @@ import { FingerprintPayload, FingerprintResult } from "../types";
 import { ONLYFANS_URL } from "../utils/const";
 import { FidstyClientError } from "../utils/errors";
 
-type OnlyfansPageState = {
+type PageState = {
   authUser: FingerprintResult["authUser"] | null;
   bcTokenSha: string | null;
   isAuth: boolean;
@@ -10,33 +10,15 @@ type OnlyfansPageState = {
   userId: FingerprintResult["userId"] | null;
 };
 
-async function getOnlyfansPageState(
-  tabId: number,
-): Promise<OnlyfansPageState | null> {
+async function getPageState(tabId: number): Promise<PageState | null> {
   const executed = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
-    // args: [waitMs, maxWaitSeconds],
-    func: async (): Promise<OnlyfansPageState | null> => {
-      // const beginAt = Date.now();
-      // const wait = (ms: number) =>
-      //   new Promise((resolve) => setTimeout(resolve, ms));
-
-      // while (Date.now() - beginAt <= maxWaitSeconds * 1000) {
+    func: async (): Promise<PageState | null> => {
       const app: any = document.getElementById("app");
       if (!app) return null;
-      // {
-      // await wait(waitMs);
-      // continue;
-      // }
-
       const vue = app.__vue__;
       if (!vue) return null;
-      // {
-      // await wait(waitMs);
-      // continue;
-      // }
-
       const authUser = vue?.authUser ?? null;
 
       return {
@@ -46,7 +28,6 @@ async function getOnlyfansPageState(
         userAgent: navigator.userAgent ?? null,
         userId: authUser?.id ?? null,
       };
-      // }
     },
   });
 
@@ -57,10 +38,12 @@ export async function collectFingerprint(
   tabId: number,
 ): Promise<FingerprintPayload> {
   try {
-    const pageState = await getOnlyfansPageState(tabId);
+    const pageState = await getPageState(tabId);
 
     if (!pageState)
-      throw new FidstyClientError("Unable to retrieve login data. Try again.");
+      throw new FidstyClientError(
+        "Unable to collect connection data. Try again.",
+      );
 
     if (!pageState.isAuth)
       throw new FidstyClientError(
@@ -70,7 +53,9 @@ export async function collectFingerprint(
     const { authUser, bcTokenSha, userAgent, userId } = pageState;
 
     if (!authUser || !userId || !userAgent || !bcTokenSha)
-      throw new FidstyClientError("Unable to retrieve login data. Try again.");
+      throw new FidstyClientError(
+        "Unable to collect connection data. Try again.",
+      );
 
     if (!authUser.isPerformer || !authUser.isRealPerformer)
       throw new FidstyClientError(
@@ -97,18 +82,10 @@ export async function copyFingerprintToClipboard(
   fingerprint: FingerprintPayload,
 ): Promise<void> {
   const result = await Notification.requestPermission();
+  if (result !== "granted")
+    throw new FidstyClientError("Permission to copy is not granted.");
 
-  try {
-    await navigator.clipboard.writeText(JSON.stringify(fingerprint));
-
-    if ("granted" == result) {
-      new Notification("Get My Fingerprint", {
-        body: "Fingerprint copied to clipboard",
-      });
-    }
-  } catch (error: any) {
-    console.error(error.message);
-  }
+  await navigator.clipboard.writeText(JSON.stringify(fingerprint));
 }
 
 export function downloadFingerprint(fingerprint: FingerprintPayload): void {
@@ -124,32 +101,3 @@ export function downloadFingerprint(fingerprint: FingerprintPayload): void {
   downloadLink.download = `fingerprint_${userId}_${username}.json`;
   downloadLink.click();
 }
-
-// export async function focusMatchingTab(
-//   urlPatterns: string[],
-//   fingerprint: FingerprintPayload,
-// ): Promise<void> {
-//   const tabs = await chrome.tabs.query({
-//     url: urlPatterns,
-//   });
-
-//   const tab = tabs.pop();
-
-//   if (!tab) throw new FidstyClientError("Unable to detect onlyfans.com tab");
-
-//   const { id: tabId } = tab;
-//   if (!tabId) throw new FidstyClientError("Unable to detect onlyfans.com tab");
-
-//   chrome.tabs.update(tabId, {
-//     active: true,
-//   });
-
-//   chrome.scripting.executeScript({
-//     target: { tabId: tabId },
-//     world: "MAIN",
-//     func: (payload: any) => {
-//       // TODO: notify the site about intercepted fingerprint
-//     },
-//     args: [fingerprint],
-//   });
-// }

@@ -1,14 +1,13 @@
-import { OnlyfansPageAuthSnapshot } from "../types";
-import { ONLYFANS_URL } from "../utils/const";
+import { readAuthScript } from "./readAuthScript";
+import type { OnlyfansPageAuthSnapshot } from "../types";
+import { ONLYFANS_URL, ONLYFANS_URL_PATTERNS } from "../utils/const";
 import { FidstyClientError } from "../utils/errors";
 
-const ONLYFANS_URL_PATTERNS = ["*://onlyfans.com/*"];
-
-export function isOnlyfansUrl(url?: string) {
-  return !!url && url.includes("onlyfans.com");
+export function isCorrectUrl(url?: string) {
+  return !!url && url.includes(ONLYFANS_URL);
 }
 
-export async function findOnlyfansTab() {
+export async function findTab() {
   try {
     const tabs = await chrome.tabs.query({
       currentWindow: true,
@@ -21,7 +20,7 @@ export async function findOnlyfansTab() {
   }
 }
 
-export async function openOnlyfansTab() {
+export async function openNewTab() {
   try {
     const tab = await chrome.tabs.create({
       active: true,
@@ -39,13 +38,13 @@ export async function openOnlyfansTab() {
   }
 }
 
-export async function ensureOnlyfansTab() {
+export async function ensureCorrectTab() {
   try {
-    let tab = await findOnlyfansTab();
+    let tab = await findTab();
     let isNewTab = false;
 
     if (!tab) {
-      const tabId = await openOnlyfansTab();
+      const tabId = await openNewTab();
       tab = await chrome.tabs.get(tabId).catch(() => {
         throw new FidstyClientError("Unable to open onlyfans.com page.");
       });
@@ -63,37 +62,22 @@ export async function ensureOnlyfansTab() {
   }
 }
 
-export async function readOnlyfansPageAuthSnapshot(
+export async function getAuthSnapshotFromChild(
   tabId: number,
 ): Promise<OnlyfansPageAuthSnapshot | null> {
   const executed = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
-    func: (): OnlyfansPageAuthSnapshot => {
-      const app: any = document.getElementById("app");
-      const vue = app?.__vue__;
-
-      if (!vue) {
-        return {
-          isAuth: false,
-          isReady: false,
-        };
-      }
-
-      return {
-        isAuth: Boolean(vue?.isAuth),
-        isReady: true,
-      };
-    },
+    func: readAuthScript,
   });
 
   return executed[0]?.result ?? null;
 }
 
-export async function getPageId() {
-  const { tabId } = await ensureOnlyfansTab();
-  return tabId;
-}
+// export async function getPageId() {
+//   const { tabId } = await ensureOnlyfansTab();
+//   return tabId;
+// }
 
 export async function getOnlyfansCookies() {
   return chrome.cookies.getAll({
