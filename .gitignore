@@ -7,3 +7,5 @@ dist/
 crx_build
 .vscode
 screenshots
+*.rar
+*.zip
