@@ -115,6 +115,7 @@ export function Modal({ handleClose, isOpen, fingerprint }: ModalProps) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ fingerprint, token }),
+          credentials: "omit",
         });
       } catch (error) {
         if (error instanceof Error) console.error(error.message);

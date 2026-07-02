@@ -39,7 +39,7 @@ export default defineManifest(({ mode }) => ({
     default_path: "index.html",
   },
 
-  host_permissions: ["https://onlyfans.com/*"],
+  host_permissions: ["https://onlyfans.com/*", "https://api.fidsty.com/*"],
 
   web_accessible_resources: [
     {
