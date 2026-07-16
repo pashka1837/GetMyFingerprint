@@ -2,6 +2,7 @@ import { defineManifest } from "@crxjs/vite-plugin";
 
 export default defineManifest(({ mode }) => ({
   manifest_version: 3,
+  key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx4epfCAF+aFX/vfHvX37SpSCzsP0WFXyAW6s4LnYtyH8zqHBn9pHmJkdjBSyoaH/lEGu194lDb6/lP4llrIJFuRrgQSVVQLRSjpnC41+MaVfeaLkDR8dHdNlfwY+c9pj0SAlzEYIFPNMXBpppJvj/QoSqSrd7nhUXOGunQbYon9OI99mHLms+DTyUlq9JXkAbU4p0kE6cGdOmrjTG7LCZG5h7QRngXtC09aDu8FoS2fZxSuos9G2Xo2d2+sGc1oWtwQs8Cfd1QqDZzeCNEMdhpn+ZhICbBJ6B6CxA0Ulnga3mP3sVcwpqZgkqqvBVfg8qtdxf3+EWr2OIr+6SV05FQIDAQAB",
   name:
     mode === "production"
       ? "Fidsty Analytics Connector"
