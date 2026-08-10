@@ -1,4 +1,4 @@
-import { PROD_SUBMIT_BASE } from "../../utils/const";
+import { WEB_URL } from "../../utils/const";
 
 export function AgreementSection() {
   return (
@@ -17,21 +17,21 @@ export function AgreementSection() {
         <p>
           The{" "}
           <a
-            href={PROD_SUBMIT_BASE}
+            href={WEB_URL}
             target="_blank"
             rel="noreferrer"
             className="text-white"
           >
             <b>Fidsty</b>
           </a>{" "}
-          project does not store fingerprints in plain text and allows only one
+          does not store your personal data in plain text and allows only one
           active session from its server.
         </p>
 
         <p>
           By agreeing to this proposal, you confirm your permission for the{" "}
           <a
-            href={PROD_SUBMIT_BASE}
+            href={WEB_URL}
             target="_blank"
             rel="noreferrer"
             className="text-white"

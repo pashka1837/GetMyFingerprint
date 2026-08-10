@@ -5,8 +5,8 @@ import {
   copyFingerprintToClipboard,
   downloadFingerprint,
 } from "../../lib/fingerprint";
-import { getSubmitFPUrl } from "../../utils/config";
 import { FidstyClientError } from "../../utils/errors";
+import { SUBMIT_BASE, SUBMIT_FP_PATH } from "../../utils/const";
 
 type ModalProps = {
   isOpen: boolean;
@@ -109,7 +109,7 @@ export function Modal({ handleClose, isOpen, fingerprint }: ModalProps) {
       let response: Response;
 
       try {
-        response = await fetch(getSubmitFPUrl(IS_DEV), {
+        response = await fetch(`${SUBMIT_BASE}${SUBMIT_FP_PATH}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
